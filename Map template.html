@@ -19,6 +19,34 @@ body {
 }
 #map { position: absolute; top: 0; bottom: 0; width: 100%; }
 
+/* Center banner with logo and title */
+.ice-banner {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.55rem 1.2rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+
+.ice-banner img {
+  width: 36px;
+  height: auto;
+  display: block;
+}
+
+.ice-banner span {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-size: 1.05rem;
+}
+
 /* Left control panel */
 .left-panel {
   position: absolute;
@@ -59,16 +87,23 @@ body {
   right: 1rem;
   z-index: 1;
   font-family: sans-serif;
-  pointer-events: none; /* Allow clicks to pass through to map */
+  pointer-events: none; /* Allow clicks to pass through to map, except inner container */
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .search-panel-wrapper h3 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
   color: #333;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 600;
   text-align: right;
   pointer-events: none;
+  padding: 0.15rem 0.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.16);
 }
 
 /* Make the search box container interactive */
@@ -165,6 +200,12 @@ body {
 <body>
 <div id="map"></div>
 
+<!-- Center banner -->
+<div class="ice-banner">
+  <img src="../../Downloads/Untitled.svg" alt="Ice logo" />
+  <span>ICE TRACKER</span>
+</div>
+
 <!-- Left-side controls -->
 <div class="left-panel">
   <button id="add-location-toggle" class="add-location-btn">
@@ -216,13 +257,18 @@ body {
     });
 
     // Store marker references
-    let currentMarker = null;
+    let currentMarker = null; // used for search/autofill markers
     // Store MapboxSearchBox reference
     let mapboxSearchBox = null;
     // Store coordinates for marker being created
     let pendingMarkerCoords = null;
     // Whether we are currently in "add location" mode
     let addLocationMode = false;
+    // Local storage key for saved markers
+    const MARKERS_STORAGE_KEY = 'ice-map-markers';
+
+    // In-memory list of saved markers
+    let savedMarkers = [];
 
     // Left panel toggle for adding locations
     const addLocationToggle = document.getElementById('add-location-toggle');
@@ -250,6 +296,65 @@ body {
     function closeMarkerModal() {
         markerModalBackdrop.style.display = 'none';
         pendingMarkerCoords = null;
+    }
+
+    // Load saved markers from localStorage and add them to the map
+    function loadSavedMarkers() {
+        try {
+            const raw = localStorage.getItem(MARKERS_STORAGE_KEY);
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            if (!Array.isArray(data)) return;
+            savedMarkers = data;
+
+            data.forEach((m) => {
+                if (!m || typeof m.lng !== 'number' || typeof m.lat !== 'number') return;
+                const title = m.title || 'Untitled location';
+                const description = m.description || '';
+                const imageDataUrl = m.imageDataUrl || null;
+
+                const popupContentParts = [`<strong>${title}</strong>`];
+                if (description) {
+                    popupContentParts.push(`<div style="margin-top:4px; font-size:12px;">${description}</div>`);
+                }
+                if (imageDataUrl) {
+                    popupContentParts.push(`<div style="margin-top:6px;"><img src="${imageDataUrl}" alt="Location photo" style="max-width:200px; max-height:150px; border-radius:4px;"></div>`);
+                }
+
+                const popup = new mapboxgl.Popup({ offset: 24 })
+                    .setHTML(popupContentParts.join(''));
+
+                const marker = new mapboxgl.Marker()
+                    .setLngLat([m.lng, m.lat])
+                    .setPopup(popup)
+                    .addTo(map);
+
+                // Toggle popup on click of the popup itself
+                popup.on('open', () => {
+                    const el = popup.getElement();
+                    if (!el) return;
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', () => {
+                        if (popup.isOpen()) {
+                            popup.remove();
+                        } else {
+                            popup.addTo(map);
+                        }
+                    });
+                });
+            });
+        } catch (e) {
+            console.error('Error loading saved markers:', e);
+        }
+    }
+
+    // Save current markers list to localStorage
+    function saveMarkers() {
+        try {
+            localStorage.setItem(MARKERS_STORAGE_KEY, JSON.stringify(savedMarkers));
+        } catch (e) {
+            console.error('Error saving markers:', e);
+        }
     }
 
     // Function to geocode address and zoom to location (kept for reuse if needed)
@@ -359,22 +464,57 @@ body {
             const popup = new mapboxgl.Popup({ offset: 24 })
                 .setHTML(popupContentParts.join(''));
 
-            new mapboxgl.Marker()
+            const marker = new mapboxgl.Marker()
                 .setLngLat([lng, lat])
                 .setPopup(popup)
                 .addTo(map);
 
             popup.addTo(map);
+
+            // Toggle popup on click of the popup itself
+            popup.on('open', () => {
+                const el = popup.getElement();
+                if (!el) return;
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', () => {
+                    if (popup.isOpen()) {
+                        popup.remove();
+                    } else {
+                        popup.addTo(map);
+                    }
+                });
+            });
         }
 
         if (file) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                createMarkerWithPopup(e.target.result);
+                const imageDataUrl = e.target.result;
+                createMarkerWithPopup(imageDataUrl);
+
+                // Save marker to local storage
+                savedMarkers.push({
+                    lng,
+                    lat,
+                    title,
+                    description,
+                    imageDataUrl
+                });
+                saveMarkers();
             };
             reader.readAsDataURL(file);
         } else {
             createMarkerWithPopup(null);
+
+            // Save marker without image
+            savedMarkers.push({
+                lng,
+                lat,
+                title,
+                description,
+                imageDataUrl: null
+            });
+            saveMarkers();
         }
 
         closeMarkerModal();
@@ -400,6 +540,11 @@ body {
         }
         const coords = [e.lngLat.lng, e.lngLat.lat];
         openMarkerModal(coords);
+    });
+
+    // Load any previously-saved markers once the map is ready
+    map.on('load', () => {
+        loadSavedMarkers();
     });
 
     // Initialize Mapbox Search autofill when the search-js script has loaded
