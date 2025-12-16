@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Display a map on a webpage</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.17.0/mapbox-gl.js"></script>
+<script
+  id="search-js"
+  defer
+  src="https://api.mapbox.com/search-js/v1.2.0/web.js">
+</script>
+<style>
+body { margin: 0; padding: 0; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+/* Address autofill side panel */
+.address-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 320px;
+  max-width: 90vw;
+  background: #ffffff;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+  font-family: sans-serif;
+  z-index: 1;
+}
+
+.address-panel h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.field-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.field-group > div {
+  flex: 1;
+  min-width: 100px;
+}
+
+.address-panel label {
+  display: block;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.address-panel input {
+  width: 100%;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<!-- Address Autofill side popup -->
+<div class="address-panel">
+  <h3>Input location</h3>
+  <form>
+    <div class="field-group">
+      <div>
+        <label for="address">Address</label>
+        <input name="address" type="text" autocomplete="address-line1" />
+      </div>
+    </div>
+    <div class="field-group">
+      <div>
+        <label for="city">City</label>
+        <input id="city" name="city" type="text" autocomplete="address-level2" />
+      </div>
+      <div>
+        <label for="state">State</label>
+        <input id="state" name="state" type="text" autocomplete="address-level1" />
+      </div>
+      <div>
+        <label for="postcode">Postcode</label>
+        <input id="postcode" name="postcode" type="text" autocomplete="postal-code" />
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoiYXNhYmtrIiwiYSI6ImNtajFqd2thaTAxaHozY29iMWw0Zm5qOGsifQ.BnE4QsgeWCaiNwzZvWYouQ';
+    const map = new mapboxgl.Map({
+        container: 'map', // container ID
+        style: 'mapbox://styles/mapbox/streets-v12', // map style
+        center: [-98.5, 39.8], // center over the continental US
+        zoom: 3, // zoomed out to show most of the US
+        // restrict panning to the continental United States (tighter bounding box)
+        maxBounds: [
+            [-125, 24], // southwest coordinates [lng, lat]
+            [-66, 50]   // northeast coordinates [lng, lat]
+        ]
+    });
+
+    // Initialize Mapbox Search autofill when the search-js script has loaded
+    const searchScript = document.getElementById('search-js');
+    searchScript.onload = function () {
+        if (window.mapboxsearch && mapboxsearch.autofill) {
+            mapboxsearch.autofill({
+                accessToken: 'pk.eyJ1IjoiYXNhYmtrIiwiYSI6ImNtajFqd2thaTAxaHozY29iMWw0Zm5qOGsifQ.BnE4QsgeWCaiNwzZvWYouQ'
+            });
+        }
+    };
+</script>
+
+</body>
+</html>
